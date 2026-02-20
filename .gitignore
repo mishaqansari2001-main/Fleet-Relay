@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+
+# Screenshots (dev artifacts)
+*.png
+
+# Playwright MCP
+.playwright-mcp/
+
+# Dev docs / scratch
+errors.md
+test_plan.md
+project_checklist.md
+Audit_RO_v1.md
+
+# Node
+node_modules/
+
+# Env files
+.env*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/

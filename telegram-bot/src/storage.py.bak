@@ -1,0 +1,143 @@
+"""In-memory storage for tickets, drivers, and messages.
+
+Provides a clean interface that can be swapped for Supabase later.
+All methods are async to match the future database API.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timezone
+
+from src.models import BufferedMessage, Driver, Message, Ticket, TicketStatus
+
+
+class Storage:
+    def __init__(self) -> None:
+        self._drivers: dict[str, Driver] = {}  # id -> Driver
+        self._drivers_by_tg: dict[int, str] = {}  # telegram_user_id -> driver.id
+        self._messages: dict[str, Message] = {}  # id -> Message
+        self._tickets: dict[str, Ticket] = {}  # id -> Ticket
+        self._buffer: dict[int, BufferedMessage] = {}  # telegram_user_id -> BufferedMessage
+        self._lock = asyncio.Lock()
+
+    # --- Drivers ---
+
+    async def get_driver_by_telegram_id(self, telegram_user_id: int) -> Driver | None:
+        driver_id = self._drivers_by_tg.get(telegram_user_id)
+        if driver_id is None:
+            return None
+        return self._drivers.get(driver_id)
+
+    async def upsert_driver(
+        self,
+        telegram_user_id: int,
+        first_name: str = "",
+        last_name: str = "",
+        username: str = "",
+    ) -> Driver:
+        existing = await self.get_driver_by_telegram_id(telegram_user_id)
+        if existing is not None:
+            existing.first_name = first_name or existing.first_name
+            existing.last_name = last_name or existing.last_name
+            existing.username = username or existing.username
+            return existing
+
+        driver = Driver(
+            telegram_user_id=telegram_user_id,
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+        )
+        self._drivers[driver.id] = driver
+        self._drivers_by_tg[telegram_user_id] = driver.id
+        return driver
+
+    async def get_driver(self, driver_id: str) -> Driver | None:
+        return self._drivers.get(driver_id)
+
+    async def list_drivers(self) -> list[Driver]:
+        return list(self._drivers.values())
+
+    # --- Messages ---
+
+    async def save_message(self, message: Message) -> Message:
+        self._messages[message.id] = message
+        return message
+
+    async def get_message(self, message_id: str) -> Message | None:
+        return self._messages.get(message_id)
+
+    async def get_messages_for_ticket(self, ticket_id: str) -> list[Message]:
+        ticket = self._tickets.get(ticket_id)
+        if ticket is None:
+            return []
+        return [self._messages[mid] for mid in ticket.message_ids if mid in self._messages]
+
+    # --- Tickets ---
+
+    async def create_ticket(self, ticket: Ticket) -> Ticket:
+        self._tickets[ticket.id] = ticket
+        return ticket
+
+    async def get_ticket(self, ticket_id: str) -> Ticket | None:
+        return self._tickets.get(ticket_id)
+
+    async def update_ticket(self, ticket_id: str, **updates: object) -> Ticket | None:
+        ticket = self._tickets.get(ticket_id)
+        if ticket is None:
+            return None
+        for key, value in updates.items():
+            if hasattr(ticket, key):
+                setattr(ticket, key, value)
+        ticket.updated_at = datetime.now(timezone.utc)
+        return ticket
+
+    async def list_tickets(
+        self,
+        status: TicketStatus | None = None,
+        driver_id: str | None = None,
+    ) -> list[Ticket]:
+        tickets = list(self._tickets.values())
+        if status is not None:
+            tickets = [t for t in tickets if t.status == status]
+        if driver_id is not None:
+            tickets = [t for t in tickets if t.driver_id == driver_id]
+        return sorted(tickets, key=lambda t: t.created_at, reverse=True)
+
+    # --- Buffer ---
+
+    async def buffer_message(self, telegram_user_id: int, entry: BufferedMessage) -> None:
+        async with self._lock:
+            self._buffer[telegram_user_id] = entry
+
+    async def get_buffered(self, telegram_user_id: int) -> BufferedMessage | None:
+        return self._buffer.get(telegram_user_id)
+
+    async def pop_buffered(self, telegram_user_id: int) -> BufferedMessage | None:
+        async with self._lock:
+            return self._buffer.pop(telegram_user_id, None)
+
+    async def get_expired_buffers(self) -> list[tuple[int, BufferedMessage]]:
+        now = datetime.now(timezone.utc)
+        expired: list[tuple[int, BufferedMessage]] = []
+        async with self._lock:
+            for user_id, entry in list(self._buffer.items()):
+                if entry.expires_at <= now:
+                    expired.append((user_id, entry))
+                    del self._buffer[user_id]
+        return expired
+
+    # --- Stats ---
+
+    async def stats(self) -> dict[str, int]:
+        return {
+            "drivers": len(self._drivers),
+            "messages": len(self._messages),
+            "tickets": len(self._tickets),
+            "buffered": len(self._buffer),
+        }
+
+
+# Singleton instance
+storage = Storage()

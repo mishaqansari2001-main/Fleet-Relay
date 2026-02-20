@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-8: var(--chart-8);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+/* ═══════════════════════════════════════════════
+   FleetRelay "Graphite" Design System
+   Light Mode — Cool gray + #0B8841 green
+   ═══════════════════════════════════════════════ */
+:root {
+  --radius: 0.625rem;
+  --background: #F6F7F8;
+  --foreground: #111318;
+  --card: #FFFFFF;
+  --card-foreground: #111318;
+  --popover: #FFFFFF;
+  --popover-foreground: #111318;
+  --primary: #0B8841;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEF0F2;
+  --secondary-foreground: #111318;
+  --muted: #EEF0F2;
+  --muted-foreground: #7C8490;
+  --accent: #EEF0F2;
+  --accent-foreground: #111318;
+  --destructive: #CD2B31;
+  --border: #DFE2E6;
+  --input: #DFE2E6;
+  --ring: #111318;
+  --chart-1: #0B8841;
+  --chart-2: #3B7DD8;
+  --chart-3: #C07D10;
+  --chart-4: #6366F1;
+  --chart-5: #CD2B31;
+  --chart-6: #0891B2;
+  --chart-7: #DB2777;
+  --chart-8: #64748B;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #111318;
+  --sidebar-primary: #0B8841;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EEF0F2;
+  --sidebar-accent-foreground: #111318;
+  --sidebar-border: #DFE2E6;
+  --sidebar-ring: #0B8841;
+}
+
+/* ═══════════════════════════════════════════════
+   Dark Mode — Near-black + #2EAD5E green
+   ═══════════════════════════════════════════════ */
+.dark {
+  --background: #0A0B0D;
+  --foreground: #ECEDEE;
+  --card: #111316;
+  --card-foreground: #ECEDEE;
+  --popover: #111316;
+  --popover-foreground: #ECEDEE;
+  --primary: #2EAD5E;
+  --primary-foreground: #0A0B0D;
+  --secondary: #18191E;
+  --secondary-foreground: #ECEDEE;
+  --muted: #18191E;
+  --muted-foreground: #55585F;
+  --accent: #18191E;
+  --accent-foreground: #ECEDEE;
+  --destructive: #E5484D;
+  --border: #222429;
+  --input: #222429;
+  --ring: #ECEDEE;
+  --chart-1: #2EAD5E;
+  --chart-2: #5B9EF0;
+  --chart-3: #F5D90A;
+  --chart-4: #A78BFA;
+  --chart-5: #E5484D;
+  --chart-6: #22D3EE;
+  --chart-7: #F472B6;
+  --chart-8: #94A3B8;
+  --sidebar: #111316;
+  --sidebar-foreground: #ECEDEE;
+  --sidebar-primary: #2EAD5E;
+  --sidebar-primary-foreground: #0A0B0D;
+  --sidebar-accent: #18191E;
+  --sidebar-accent-foreground: #ECEDEE;
+  --sidebar-border: #222429;
+  --sidebar-ring: #2EAD5E;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

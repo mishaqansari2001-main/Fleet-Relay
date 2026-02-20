@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -14,6 +14,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +24,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   MagnifyingGlass,
   Circle,
@@ -30,6 +54,11 @@ import {
   UsersThree,
   Warning,
   Funnel,
+  Plus,
+  CaretUpDown,
+  Check,
+  UserPlus,
+  CircleNotch,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import {
@@ -40,7 +69,7 @@ import {
   getDriverFullName,
   timeAgo,
 } from "@/lib/types";
-import type { ScoreCategory, User } from "@/lib/types";
+import type { ScoreCategory, User, Driver } from "@/lib/types";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 // ── Constants ──
@@ -55,6 +84,11 @@ const statusTabs: { value: TicketStatus | "all"; label: string }[] = [
   { value: "dismissed", label: "Dismissed" },
 ];
 
+// ── Types ──
+type DriverOption = Pick<Driver, "id" | "first_name" | "last_name" | "username"> & {
+  phone_number?: string | null;
+};
+
 // ── Props ──
 interface TicketsClientProps {
   tickets: TicketWithRelations[];
@@ -67,6 +101,7 @@ interface TicketsClientProps {
     role: "admin" | "operator";
   };
   slaThresholds: { urgent: number; normal: number };
+  drivers: DriverOption[];
 }
 
 export function TicketsClient({
@@ -75,6 +110,7 @@ export function TicketsClient({
   scoreCategories,
   currentUser,
   slaThresholds,
+  drivers,
 }: TicketsClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -82,10 +118,36 @@ export function TicketsClient({
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "all">("all");
   const [operatorFilter, setOperatorFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [localDrivers, setLocalDrivers] = useState<DriverOption[]>(drivers);
 
   // Subscribe to realtime changes on tickets + settings tables
   useRealtimeRefresh("tickets");
   useRealtimeRefresh("settings");
+
+  // Sync drivers prop when it changes (e.g. on router.refresh)
+  useEffect(() => {
+    setLocalDrivers(drivers);
+  }, [drivers]);
+
+  // Cross-tab listener for newly added drivers
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "fleetrelay_new_driver" && e.newValue) {
+        try {
+          const newDriver = JSON.parse(e.newValue) as DriverOption;
+          setLocalDrivers((prev) => {
+            if (prev.some((d) => d.id === newDriver.id)) return prev;
+            return [...prev, newDriver];
+          });
+        } catch {
+          // ignore parse errors
+        }
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   // ── Filtering ──
   const filteredTickets = useMemo(() => {
@@ -245,15 +307,24 @@ export function TicketsClient({
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Tickets
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {currentUser.role === "admin"
-            ? "Manage and monitor all support tickets."
-            : "View open tickets and manage your assigned work."}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Tickets
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {currentUser.role === "admin"
+              ? "Manage and monitor all support tickets."
+              : "View open tickets and manage your assigned work."}
+          </p>
+        </div>
+        <Button
+          onClick={() => setCreateDialogOpen(true)}
+          className="bg-[#0B8841] hover:bg-[#097435] dark:bg-[#2EAD5E] dark:hover:bg-[#38C06B] text-white dark:text-[#0A0B0D] text-sm font-medium"
+        >
+          <Plus size={16} weight="bold" className="mr-1.5" />
+          New Ticket
+        </Button>
       </div>
 
       {/* Status tabs */}
@@ -503,6 +574,325 @@ export function TicketsClient({
           </div>
         </div>
       )}
+
+      {/* Create Ticket Dialog */}
+      <CreateTicketDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        drivers={localDrivers}
+        currentUser={currentUser}
+      />
     </div>
+  );
+}
+
+// ── Create Ticket Dialog ──
+function CreateTicketDialog({
+  open,
+  onOpenChange,
+  drivers,
+  currentUser,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  drivers: DriverOption[];
+  currentUser: { id: string; full_name: string; email: string; role: "admin" | "operator" };
+}) {
+  const router = useRouter();
+  const [description, setDescription] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState<"normal" | "urgent">("normal");
+  const [assignToMe, setAssignToMe] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auto-select newly added driver via cross-tab
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === "fleetrelay_new_driver" && e.newValue) {
+        try {
+          const newDriver = JSON.parse(e.newValue) as DriverOption;
+          setSelectedDriverId(newDriver.id);
+        } catch {
+          // ignore
+        }
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setDescription("");
+      setSelectedDriverId(null);
+      setCategory("");
+      setPriority("normal");
+      setAssignToMe(true);
+      setCreating(false);
+      setError(null);
+    }
+  }, [open]);
+
+  const selectedDriver = drivers.find((d) => d.id === selectedDriverId);
+  const canCreate = description.trim() && selectedDriverId && !creating;
+
+  async function handleCreate() {
+    if (!canCreate || !selectedDriverId) return;
+    setCreating(true);
+    setError(null);
+
+    const supabase = createClient();
+    const now = new Date().toISOString();
+
+    // 1. Insert ticket
+    const { data: newTicket, error: ticketError } = await supabase
+      .from("tickets")
+      .insert({
+        driver_id: selectedDriverId,
+        source_type: "manual" as const,
+        source_name: "Manual",
+        ai_summary: description.trim(),
+        ai_category: category.trim() || null,
+        priority: priority,
+        is_urgent: priority === "urgent",
+        status: assignToMe ? ("in_progress" as const) : ("open" as const),
+        assigned_operator_id: assignToMe ? currentUser.id : null,
+        claimed_at: assignToMe ? now : null,
+      })
+      .select("id")
+      .single();
+
+    if (ticketError || !newTicket) {
+      setError(ticketError?.message || "Failed to create ticket");
+      setCreating(false);
+      return;
+    }
+
+    // 2. Insert system message
+    await supabase.from("ticket_messages").insert({
+      ticket_id: newTicket.id,
+      direction: "inbound" as const,
+      sender_type: "system" as const,
+      sender_name: "System",
+      content_type: "text" as const,
+      content_text: `Ticket created manually by ${currentUser.full_name}`,
+      is_internal_note: false,
+    });
+
+    // 3. Insert description as operator internal note
+    await supabase.from("ticket_messages").insert({
+      ticket_id: newTicket.id,
+      direction: "outbound" as const,
+      sender_type: "operator" as const,
+      sender_name: currentUser.full_name,
+      sender_user_id: currentUser.id,
+      content_type: "text" as const,
+      content_text: description.trim(),
+      is_internal_note: true,
+    });
+
+    onOpenChange(false);
+    router.push(`/dashboard/tickets/${newTicket.id}`);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create Ticket</DialogTitle>
+          <DialogDescription>
+            Manually create a support ticket for a driver.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="ticket-desc" className="text-sm font-medium">
+              Description <span className="text-[#CD2B31]">*</span>
+            </Label>
+            <Textarea
+              id="ticket-desc"
+              placeholder="Describe the issue..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="resize-none text-sm"
+            />
+          </div>
+
+          {/* Driver combobox */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Driver <span className="text-[#CD2B31]">*</span>
+            </Label>
+            <Popover open={driverPopoverOpen} onOpenChange={setDriverPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={driverPopoverOpen}
+                  className="w-full justify-between h-9 text-sm border-border bg-background font-normal"
+                >
+                  {selectedDriver ? (
+                    <span className="truncate">
+                      {getDriverFullName(selectedDriver)}
+                      {selectedDriver.username && (
+                        <span className="text-muted-foreground ml-1.5">
+                          @{selectedDriver.username}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Select a driver...</span>
+                  )}
+                  <CaretUpDown size={14} className="ml-2 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search drivers..." />
+                  <CommandList>
+                    <CommandEmpty>No driver found.</CommandEmpty>
+                    <CommandGroup>
+                      {drivers.map((driver) => (
+                        <CommandItem
+                          key={driver.id}
+                          value={`${driver.first_name} ${driver.last_name || ""} ${driver.username || ""}`}
+                          onSelect={() => {
+                            setSelectedDriverId(driver.id);
+                            setDriverPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            size={14}
+                            className={cn(
+                              "mr-2 shrink-0",
+                              selectedDriverId === driver.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">
+                            {getDriverFullName(driver)}
+                          </span>
+                          {driver.username && (
+                            <span className="ml-1.5 text-muted-foreground text-xs">
+                              @{driver.username}
+                            </span>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <CommandSeparator />
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => {
+                          window.open("/dashboard/drivers/new", "_blank");
+                          setDriverPopoverOpen(false);
+                        }}
+                      >
+                        <UserPlus size={14} className="mr-2 text-[#0B8841] dark:text-[#2EAD5E]" />
+                        <span className="text-[#0B8841] dark:text-[#2EAD5E] font-medium">
+                          Add New Driver
+                        </span>
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="ticket-category" className="text-sm font-medium">
+              Category
+            </Label>
+            <Input
+              id="ticket-category"
+              placeholder="e.g. Breakdown, ELD Issue, Documentation..."
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="h-9 bg-background border-border text-sm"
+            />
+          </div>
+
+          {/* Priority */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Priority</Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPriority("normal")}
+                className={cn(
+                  "h-8 text-xs border-border",
+                  priority === "normal" && "border-foreground bg-foreground/5"
+                )}
+              >
+                Normal
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPriority("urgent")}
+                className={cn(
+                  "h-8 text-xs border-border",
+                  priority === "urgent" &&
+                    "border-[#CD2B31] dark:border-[#E5484D] bg-[#CD2B31]/5 dark:bg-[#E5484D]/5 text-[#CD2B31] dark:text-[#E5484D]"
+                )}
+              >
+                Urgent
+              </Button>
+            </div>
+          </div>
+
+          {/* Assign to me */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="assign-to-me"
+              checked={assignToMe}
+              onCheckedChange={(checked) => setAssignToMe(checked === true)}
+            />
+            <Label htmlFor="assign-to-me" className="text-sm font-normal cursor-pointer">
+              Assign to me
+            </Label>
+          </div>
+
+          {error && (
+            <p className="text-sm text-[#CD2B31] dark:text-[#E5484D]">{error}</p>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="border-border"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={!canCreate}
+            className="bg-[#0B8841] hover:bg-[#097435] dark:bg-[#2EAD5E] dark:hover:bg-[#38C06B] text-white dark:text-[#0A0B0D]"
+          >
+            {creating ? (
+              <CircleNotch size={14} className="animate-spin mr-1" />
+            ) : (
+              <Plus size={14} weight="bold" className="mr-1" />
+            )}
+            Create Ticket
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

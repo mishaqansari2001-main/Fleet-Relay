@@ -26,12 +26,13 @@ export default async function TicketsPage() {
     role: profile.role as "admin" | "operator",
   };
 
-  // Parallel fetch all ticket page data + SLA settings
+  // Parallel fetch all ticket page data + SLA settings + drivers
   const [
     { data: tickets },
     { data: operators },
     { data: scoreCategories },
     { data: slaRows },
+    { data: drivers },
   ] = await Promise.all([
     supabase
       .from("tickets")
@@ -63,6 +64,10 @@ export default async function TicketsPage() {
         "sla_urgency_threshold_minutes",
         "sla_normal_threshold_minutes",
       ]),
+    supabase
+      .from("drivers")
+      .select("id, first_name, last_name, username, phone_number")
+      .order("first_name"),
   ]);
 
   const slaThresholds = { urgent: 30, normal: 240 };
@@ -80,6 +85,7 @@ export default async function TicketsPage() {
       scoreCategories={scoreCategories ?? []}
       currentUser={currentUser}
       slaThresholds={slaThresholds}
+      drivers={drivers ?? []}
     />
   );
 }

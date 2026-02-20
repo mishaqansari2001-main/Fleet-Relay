@@ -75,7 +75,8 @@ export type Database = {
           id: string
           last_name: string | null
           last_seen_at: string
-          telegram_user_id: number
+          phone_number: string | null
+          telegram_user_id: number | null
           updated_at: string
           username: string | null
         }
@@ -86,7 +87,8 @@ export type Database = {
           id?: string
           last_name?: string | null
           last_seen_at?: string
-          telegram_user_id: number
+          phone_number?: string | null
+          telegram_user_id?: number | null
           updated_at?: string
           username?: string | null
         }
@@ -97,7 +99,8 @@ export type Database = {
           id?: string
           last_name?: string | null
           last_seen_at?: string
-          telegram_user_id?: number
+          phone_number?: string | null
+          telegram_user_id?: number | null
           updated_at?: string
           username?: string | null
         }
@@ -434,7 +437,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           resolved_at: string | null
           score_category_id: string | null
-          source_chat_id: number
+          source_chat_id: number | null
           source_name: string | null
           source_type: Database["public"]["Enums"]["ticket_source"]
           status: Database["public"]["Enums"]["ticket_status"]
@@ -461,7 +464,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolved_at?: string | null
           score_category_id?: string | null
-          source_chat_id: number
+          source_chat_id?: number | null
           source_name?: string | null
           source_type: Database["public"]["Enums"]["ticket_source"]
           status?: Database["public"]["Enums"]["ticket_status"]
@@ -488,7 +491,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           resolved_at?: string | null
           score_category_id?: string | null
-          source_chat_id?: number
+          source_chat_id?: number | null
           source_name?: string | null
           source_type?: Database["public"]["Enums"]["ticket_source"]
           status?: Database["public"]["Enums"]["ticket_status"]
@@ -694,7 +697,7 @@ export type Database = {
       message_sender_type: "driver" | "operator" | "system"
       telegram_connection_type: "business_account" | "group"
       ticket_priority: "normal" | "urgent"
-      ticket_source: "business_dm" | "group"
+      ticket_source: "business_dm" | "group" | "manual"
       ticket_status:
         | "open"
         | "in_progress"
@@ -843,7 +846,7 @@ export const Constants = {
       message_sender_type: ["driver", "operator", "system"],
       telegram_connection_type: ["business_account", "group"],
       ticket_priority: ["normal", "urgent"],
-      ticket_source: ["business_dm", "group"],
+      ticket_source: ["business_dm", "group", "manual"],
       ticket_status: [
         "open",
         "in_progress",

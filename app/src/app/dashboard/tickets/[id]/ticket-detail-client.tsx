@@ -44,6 +44,7 @@ import {
   Warning,
   ChatCircleDots,
   UsersThree,
+  PencilSimple,
   User as UserIcon,
   Clock,
   Ticket as TicketIcon,
@@ -143,7 +144,7 @@ export function TicketDetailClient({
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [replyText, setReplyText] = useState("");
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  const [isInternalNote, setIsInternalNote] = useState(ticket.source_type === "manual");
   const [sending, setSending] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [releasing, setReleasing] = useState(false);
@@ -459,13 +460,19 @@ export function TicketDetailClient({
               {ticket.ai_category && <span>{ticket.ai_category}</span>}
               {ticket.ai_location && <span>{ticket.ai_location}</span>}
               <span className="flex items-center gap-1">
-                {ticket.source_type === "business_dm" ? (
+                {ticket.source_type === "manual" ? (
+                  <PencilSimple size={12} />
+                ) : ticket.source_type === "business_dm" ? (
                   <ChatCircleDots size={12} />
                 ) : (
                   <UsersThree size={12} />
                 )}
                 {ticket.source_name ||
-                  (ticket.source_type === "business_dm" ? "DM" : "Group")}
+                  (ticket.source_type === "manual"
+                    ? "Manual"
+                    : ticket.source_type === "business_dm"
+                      ? "DM"
+                      : "Group")}
               </span>
               <span>{formatTimestamp(ticket.created_at)}</span>
             </div>
@@ -495,6 +502,12 @@ export function TicketDetailClient({
           {/* Reply input — Notion-style */}
           {canReply && (
             <div className="shrink-0 pt-4 pb-2">
+              {ticket.source_type === "manual" && (
+                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                  <PencilSimple size={12} />
+                  This is a manually created ticket. Messages are saved as internal notes.
+                </p>
+              )}
               <div
                 className={cn(
                   "rounded-xl border bg-card transition-all duration-150",
